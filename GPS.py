@@ -10,8 +10,9 @@ class GPS:
 		self.ser = serial.Serial(port=self.port, baudrate=self.baudrate) 
 		self.initialized = False
 		self.current_milli_time = lambda: int(round(time.time() * 1000))
-                self.valid_coords = False
-                self.valid_satellites = False
+
+        self.valid_coords = False
+        self.valid_satellites = False
                 
 	def attach(self):
 		if self.initialized is True:
@@ -21,12 +22,23 @@ class GPS:
 		time.sleep(1)
 		if self.wait_for_reply('OK\r\n', 2000) is not True:
                         print('Not OK')                
+
+		self.valid_coords = False
+		self.valid_satellites = False
+
+	def attach(self):
+		if self.initialized is True:
+			return False
+		
+		self.port.write(str.encode('AT+CGNSPWR=1' + '\r\n')) #Power on the GPS antenna, should return OK
+		if wait_for_reply('OK\r\n', 2000) is not True:
 			return False
 		#print('power on')
 		
-		self.ser.write(str.encode('AT+CGNSTST=1' + '\r\n'))
-		time.sleep(1)
-		if self.wait_for_reply('OK\r\n', 2000) is not True:
+
+
+		self.port.write(str.encode('AT+CGNSTST=1' + '\r\n'))
+		if wait_for_reply('OK\r\n', 2000) is not True:
 			return False
 		
 
@@ -45,7 +57,7 @@ class GPS:
                         readings = None
                         # If the sentence is a RMC sentence and the data is valid
 			if tokens[0] == '$GPRMC':
-                                self.valid_satellites = False
+				self.valid_satellites = False
 				if tokens[1] != '':
 					time = tokens[1]
 					hour = time[:2]
@@ -92,8 +104,17 @@ class GPS:
         		elif fix_quality == '2':
         			fix_quality = 'DGPS Fix'
 
+					self.valid_coords = True
 
 
+			if tokens[0] == '$GPGSV':
+				self.valid_satellites = True
+				self.valid_coords = False
+				num_satellites = tokens[3]
+				if readings is not None: 
+					readings.num_satellites = num_satellites
+				else:
+					readings = GPS_readings.GPS_readings(num_satellites=num_satellites)
 			return readings
 
 		else:
